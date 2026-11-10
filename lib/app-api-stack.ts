@@ -8,6 +8,7 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { Construct } from 'constructs';
 import { seedItems } from '../seed/movie-cast';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export interface AppApiStackProps extends cdk.StackProps {
   userPool: cognito.IUserPool;
@@ -47,10 +48,22 @@ export class AppApiStack extends cdk.Stack {
       USER_POOL_ID: props.userPool.userPoolId,
       CLIENT_ID: props.userPoolClient.userPoolClientId,
     });
-
     
-    table.grantReadWriteData(addMovieRoleFn);
-    table.grant(addMovieRoleFn, 'dynamodb:ConditionCheckItem');
+    getMovieRolesFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [table.tableArn],
+    }));
+
+    getActorFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:GetItem'],
+      resources: [table.tableArn],
+    }));
+
+
+    addMovieRoleFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:ConditionCheckItem', 'dynamodb:PutItem'],
+      resources: [table.tableArn],
+    }));
 
 
     // Sample data, written once when the stack is created.
@@ -95,7 +108,6 @@ export class AppApiStack extends cdk.Stack {
     };
     // Routes
     const moviesResource = api.root.addResource('movies');
-
     const movieRolesResource = moviesResource.addResource('{movieID}').addResource('roles');  
     movieRolesResource.addMethod(
       'GET',
@@ -106,8 +118,7 @@ export class AppApiStack extends cdk.Stack {
     api.root
       .addResource('actors')
       .addResource('{actorID}')
-      .addMethod('GET', new apig.LambdaIntegration(getActorFn), userAuth);
-      
+      .addMethod('GET', new apig.LambdaIntegration(getActorFn), userAuth); 
     const addRoleResource = moviesResource.addResource('roles');
 
     addRoleResource.addMethod(

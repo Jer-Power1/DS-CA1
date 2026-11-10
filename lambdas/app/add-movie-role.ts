@@ -8,6 +8,7 @@ import { logRequest } from "../shared/request-logger";
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
+    logRequest(event);
   const body = parseJsonObject(event);
   if (isResponse(body)) return body;
 
